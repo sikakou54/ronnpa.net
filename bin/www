@@ -1,0 +1,927 @@
+#!/usr/bin/env node
+"use strict";
+
+
+const PLAY_TIME = 60;
+const WATCHERS_MAX_COUNT = 1;
+
+const MSG_TYPE_MASK = 0x000F;
+const MSG_ID_MASK = 0xFFF0;
+
+const MSG_TYPE_REQUEST = 0x0001;
+const MSG_TYPE_RESPONSE = 0x0002;
+const MSG_TYPE_RTC = 0x0004;
+
+const MSGID_ROOM_ENTER = 0x0010;
+const MSGID_MEDIA = 0x0020;
+const MSGID_CONNECTION = 0x0040;
+const MSGID_COMMUNICATION = 0x0080;
+const MSGID_DISCONNECTION = 0x0100;
+const MSGID_CANDIDATE_RETRY = 0x0200;
+const MSGID_ROOM_JOIN_NOTIFY = 0x0400;
+const MSGID_GAME_START = 0x0800;
+const MSGID_TIMER_INTERVAL = 0x1000;
+const MSGID_POINT_UP = 0x2000;
+const MSGID_TIMEOUT = 0x4000;
+
+const MSGID_ROOM_ENTER_REQ = MSGID_ROOM_ENTER | MSG_TYPE_REQUEST;
+const MSGID_ROOM_ENTER_RES = MSGID_ROOM_ENTER | MSG_TYPE_RESPONSE;
+const MSGID_MEDIA_REQ = MSGID_MEDIA | MSG_TYPE_REQUEST;
+const MSGID_MEDIA_RES = MSGID_MEDIA | MSG_TYPE_RESPONSE;
+const MSGID_CONNECTION_REQ = MSGID_CONNECTION | MSG_TYPE_REQUEST;
+const MSGID_CONNECTION_RES = MSGID_CONNECTION | MSG_TYPE_RESPONSE;
+const MSGID_DISCONNECTION_REQ = MSGID_DISCONNECTION | MSG_TYPE_REQUEST;
+const MSGID_DISCONNECTION_RES = MSGID_DISCONNECTION | MSG_TYPE_RESPONSE;
+const MSGID_COMMUNICATION_RTC = MSGID_COMMUNICATION | MSG_TYPE_RTC;
+const MSGID_CANDIDATE_RETRY_RTC = MSGID_CANDIDATE_RETRY | MSG_TYPE_RTC;
+const MSGID_ROOM_JOIN_NOTIFY_RTC = MSGID_ROOM_JOIN_NOTIFY | MSG_TYPE_RTC;
+const MSGID_GAME_START_REQ = MSGID_GAME_START | MSG_TYPE_REQUEST;
+const MSGID_GAME_START_RES = MSGID_GAME_START | MSG_TYPE_RESPONSE;
+const MSGID_TIMER_INTERVAL_REQ = MSGID_TIMER_INTERVAL | MSG_TYPE_REQUEST;
+const MSGID_TIMER_INTERVAL_RES = MSGID_TIMER_INTERVAL | MSG_TYPE_RESPONSE;
+const MSGID_POINT_UP_REQ = MSGID_POINT_UP | MSG_TYPE_REQUEST;
+const MSGID_POINT_UP_RES = MSGID_POINT_UP | MSG_TYPE_RESPONSE;
+const MSGID_TIMEOUT_REQ = MSGID_TIMEOUT | MSG_TYPE_REQUEST;
+const MSGID_TIMEOUT_RES = MSGID_TIMEOUT | MSG_TYPE_RESPONSE;
+
+/**
+ * Module dependencies.
+ */
+
+let app = require('../app');
+let debug = require('debug')('myapp:server');
+let http = require('http');
+let socket = require('socket.io');
+const { Socket } = require('dgram');
+const { token } = require('morgan');
+const { Z_ASCII } = require('zlib');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+let port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+let server = http.createServer(app);
+let io = socket(server);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+class pair {
+    constructor(_sokcet_id) {
+        this.socket_id = _sokcet_id;
+        this.state = 'none';
+    }
+    get_socket_id() {
+        return this.socket_id;
+    }
+    get_state() {
+        return this.state;
+    }
+    set_state(_state) {
+        this.state = _state;
+    }
+}
+
+class obj {
+    constructor(_sokcet_id) {
+        this.socket_id = _sokcet_id;
+        this.point = 0;
+        this.media = false;
+        this.pairs = [];
+    }
+    get_state() {
+        return this.state;
+    }
+    get_socket_id() {
+        return this.socket_id;
+    }
+    get_pairs() {
+        return this.pairs
+    }
+    get_media() {
+        return this.media;
+    }
+    get_pair(_idx) {
+        return this.pairs[_idx];
+    }
+    get_pairs_count() {
+        return this.pairs.length;
+    }
+    get_point() {
+        return this.point;
+    }
+    set_state(_state) {
+        this.state = _state;
+    }
+    set_socket_id(_socket_id) {
+        this.socket_id = _socket_id;
+    }
+    set_pair(_pair) {
+        this.pairs.push(new pair(_pair));
+    }
+    set_media(_media) {
+        this.media = _media;
+    }
+    set_point(_point) {
+        this.point = _point;
+    }
+    set_point_countup() {
+        this.point++;
+    }
+    isPair(_socket_id) {
+        let ret = false;
+        for (let i = 0; i < this.pairs.length; i++) {
+            if (_socket_id == this.pairs[i].get_socket_id()) {
+                ret = true;
+                break;
+            }
+        }
+        return ret;
+    }
+}
+
+/**
+ * CLASS 定義
+ */
+class ROOM_TBL {
+    constructor(_room_id) {
+        this.room_id = _room_id;
+        this.positive = null;
+        this.negative = null;
+        this.watchers = [];
+        this.state = 'none';
+    }
+
+    get_room_id() {
+        return this.room_id;
+    }
+    get_positive() {
+        return this.positive;
+    }
+    get_negative() {
+        return this.negative;
+    }
+    get_watchers() {
+        return this.watchers;
+    }
+    get_watcher(_idx) {
+        return this.watchers[_idx];
+    }
+    get_state() {
+        return this.state;
+    }
+
+    set_positive(_positive) {
+        this.positive = new obj(_positive);
+    }
+    set_negative(_negative) {
+        this.negative = new obj(_negative);
+    }
+    set_watcher(_watcher) {
+        this.watchers.push(new obj(_watcher));
+    }
+    set_state(_state) {
+        this.state = _state;
+    }
+    isRoomJoin(_type) {
+        let ret = true;
+        if (0 == _type && null != this.positive) {
+            ret = false;
+        } else if (1 == _type && null != this.negative) {
+            ret = false;
+        }
+
+        return ret;
+    }
+
+    isMemberCollected() {
+        let ret = true;
+
+        console.log('positive', this.positive);
+        console.log('negative', this.negative);
+        console.log('watcher', this.watchers.length);
+
+        if (null == this.positive) {
+            ret = false;
+        }
+        if (null == this.negative) {
+            ret = false;
+        }
+        if (WATCHERS_MAX_COUNT > this.watchers.length) {
+            ret = false;
+        }
+        return ret;
+    }
+
+    show_room_member() {
+        //console.log('positive :', this.positive);
+        //console.log('negative :', this.negative);
+        for (let i = 0; i < this.watchers.length; i++) {
+            //console.log('watcher :', this.watchers[i]);
+        }
+    }
+}
+
+class USER_TBL {
+    constructor(_socket_id, _room_id, _type, _name) {
+        this.socket_id = _socket_id;
+        this.room_id = _room_id;
+        this.type = _type;
+        this.name = _name;
+    }
+}
+/***********************************************************
+ TBL定義 
+***********************************************************/
+let room_info_tbl = [];
+let user_info_tbl = [];
+
+/***********************************************************
+ TBL関連処理 
+***********************************************************/
+
+/**
+ * 
+ * @param _room_info ルーム情報
+ */
+function setRoomInfo(_room_info) {
+
+    if (null == getRoomInfo(_room_info.room_id)) {
+        room_info_tbl.push(_room_info);
+    } else {
+        for (let room = 0; room < room_info_tbl.length; room++) {
+            if (_room_info.room_id == room_info_tbl[room].room_id) {
+                room_info_tbl[room] = _room_info;
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * 
+ * @param _room_id ルームID
+ */
+function getRoomInfo(_room_id) {
+
+    let tbl = null;
+
+    /* ルームIDが一致するROOM情報を検索する*/
+    for (let i = 0; i < room_info_tbl.length; i++) {
+        if (_room_id == room_info_tbl[i].room_id) {
+            tbl = room_info_tbl[i];
+            break;
+        }
+    }
+
+    return tbl;
+}
+
+
+function removeRoomInfo(_room_id) {
+    /* ルームIDが一致するROOM情報を検索する*/
+    for (let i = 0; i < room_info_tbl.length; i++) {
+        if (_room_id == room_info_tbl[i].room_id) {
+            room_info_tbl.splice(i, 1);
+            break;
+        }
+    }
+}
+
+
+/**
+ * 
+ * @param _room_info ルーム情報
+ */
+function setUserInfo(_user_info) {
+
+    if (null == getUsernfo(_user_info.socket_id)) {
+        user_info_tbl.push(_user_info);
+    } else {
+        for (let user = 0; user < user_info_tbl.length; user++) {
+            if (_user_info.socket_id == user_info_tbl[user].socket_id) {
+                user_info_tbl[user] = _user_info;
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * 
+ * @param _room_id ルームID
+ */
+function getUserInfo(_socket_id) {
+
+    let tbl = null;
+
+    /* ルームIDが一致するROOM情報を検索する*/
+    for (let user = 0; user < user_info_tbl.length; user++) {
+        if (_socket_id == user_info_tbl[user].socket_id) {
+            tbl = user_info_tbl[user];
+            break;
+        }
+    }
+
+    return tbl;
+}
+
+
+function removeUserInfo(_socket_id) {
+    /* ルームIDが一致するROOM情報を検索する*/
+    for (let user = 0; user < user_info_tbl.length; user++) {
+        if (_socket_id == user_info_tbl[user].socket_id) {
+            user_info_tbl.splice(user, 1);
+            break;
+        }
+    }
+}
+/***********************************************************
+ 共通 
+***********************************************************/
+/**
+ * 
+ * @param _from 送信元
+ * @param _to 送信先
+ * @param _msgid メッセージID
+ * @param _data 送信データ
+ */
+function createMessage(_sender, _destination, _msgid, _data) {
+
+    let obj = {
+        header: {
+            sender: _sender,
+            destination: _destination,
+            msgid: _msgid
+        },
+        data: _data
+    }
+
+    return JSON.stringify(obj);
+}
+
+io.on('connection', async (socket) => {
+
+    console.log('connection', socket.id);
+
+    socket.on('message', async function (_message) {
+
+        //console.log('message', _message);
+
+        let message = JSON.parse(_message);
+
+        switch (message.header.msgid & MSG_ID_MASK) {
+            case MSGID_ROOM_ENTER:
+
+                if (MSG_TYPE_REQUEST == (message.header.msgid & MSG_TYPE_MASK)) {
+
+                    let room_info = getRoomInfo(message.data.room_id);
+                    let msg = null;
+
+                    /** ルームTBLが無ければ作る */
+                    if (null == room_info) {
+                        room_info = new ROOM_TBL(message.data.room_id);
+                        room_info_tbl.push(room_info);
+                    }
+
+                    /** まだゲームを開始していない場合はルーム参加者の認証とゲーム開始条件を満たしたか確認する */
+                    if ('started' != room_info.get_state()) {
+
+                        /** ルームに参加可能か */
+                        if (true == room_info.isRoomJoin(message.data.room_type)) {
+
+                            /** 肯定 */
+                            if (0 == message.data.room_type) {
+                                room_info.set_positive(message.header.sender);
+                                /** 否定 */
+                            } else if (1 == message.data.room_type) {
+                                room_info.set_negative(message.header.sender);
+                                /** 視聴 */
+                            } else if (2 == message.data.room_type) {
+                                room_info.set_watcher(message.header.sender);
+                            }
+
+                            /** ユーザー情報を登録する */
+                            user_info_tbl.push(new USER_TBL(message.header.sender, message.data.room_id, message.data.room_type, message.data.user_name));
+
+                            /** ルームに入れる */
+                            socket.join(message.data.room_id);
+
+                            /** ENTER応答 メッセージ送信 */
+                            msg = createMessage(message.header.sender, 'admin', MSGID_ROOM_ENTER_RES, { room_join_result: true });
+                            socket.emit('message', msg);
+
+                            msg = createMessage('admin', 'all_user', MSGID_ROOM_JOIN_NOTIFY_RTC, { user_name: message.data.user_name });
+                            socket.broadcast.to(message.data.room_id).emit('message', msg);
+
+                        } else {
+
+                            console.log('room join not success...', message.data.room_id, message.data.room_type);
+
+                            /** ENTER応答 メッセージ送信 */
+                            msg = createMessage(message.header.sender, 'admin', MSGID_ROOM_ENTER_RES, { room_join_result: false });
+                            socket.emit('message', msg);
+                        }
+
+                        /** ゲームを始められる条件がそっろたか */
+                        if (true == room_info.isMemberCollected()) {
+
+                            if (false == room_info.get_positive().isPair(room_info.get_negative().get_socket_id())) {
+                                room_info.get_positive().set_pair(room_info.get_negative().get_socket_id());
+                            } else {
+                                //console.log('positive-negative', room_info.get_negative().get_socket_id());
+                            }
+
+                            if (false == room_info.get_negative().isPair(room_info.get_positive().get_socket_id())) {
+                                room_info.get_negative().set_pair(room_info.get_positive().get_socket_id());
+                            } else {
+                                //console.log('negative-positive', room_info.get_positive().get_socket_id());
+                            }
+
+                            /** 配信者の接続状態を確認し接続されていない相手と接続する */
+                            for (let i = 0; i < room_info.get_watchers().length; i++) {
+
+                                if (false == room_info.get_watcher(i).isPair(room_info.get_positive().get_socket_id())) {
+                                    room_info.get_watcher(i).set_pair(room_info.get_positive().get_socket_id());
+                                } else {
+                                    //console.log('watcher-positive', room_info.get_positive().get_socket_id());
+                                }
+
+                                if (false == room_info.get_watcher(i).isPair(room_info.get_negative().get_socket_id())) {
+                                    room_info.get_watcher(i).set_pair(room_info.get_negative().get_socket_id());
+                                } else {
+                                    //console.log('watcher-negative', room_info.get_negative().get_socket_id());
+                                }
+
+                                if (false == room_info.get_positive().isPair(room_info.get_watcher(i).get_socket_id())) {
+                                    room_info.get_positive().set_pair(room_info.get_watcher(i).get_socket_id());
+                                } else {
+                                    //console.log('positive-watcher', room_info.get_watcher(i).get_socket_id());
+                                }
+
+                                if (false == room_info.get_negative().isPair(room_info.get_watcher(i).get_socket_id())) {
+                                    room_info.get_negative().set_pair(room_info.get_watcher(i).get_socket_id());
+                                } else {
+                                    //console.log('negative-watcher', room_info.get_watcher(i).get_socket_id());
+                                }
+                            }
+
+                            /** [positive] MEDIA要求 メッセージ送信 */
+                            msg = createMessage(room_info.get_positive().get_socket_id(), 'admin', MSGID_MEDIA_REQ, { dummy: null });
+                            io.to(room_info.get_positive().get_socket_id()).emit('message', msg);
+
+                            /** [negative] MEDIA要求 メッセージ送信 */
+                            msg = createMessage(room_info.get_negative().get_socket_id(), 'admin', MSGID_MEDIA_REQ, { dummy: null });
+                            io.to(room_info.get_negative().get_socket_id()).emit('message', msg);
+                        } else {
+                            console.log('not start...');
+                        }
+
+                        /**　ゲームが始まっている場合は視聴のみの途中参加を許可する */
+                    } else {
+
+                        /** ルームに参加可能か */
+                        if (true == room_info.isRoomJoin(message.data.room_type)) {
+
+                            /** 視聴 */
+                            if (2 == message.data.room_type) {
+
+                                /** 視聴者を設定 */
+                                room_info.set_watcher(message.header.sender);
+
+                                /** ユーザー情報を登録する */
+                                user_info_tbl.push(new USER_TBL(message.header.sender, message.data.room_id, message.data.room_type, message.data.user_name));
+
+                                /** ルームに入れる */
+                                socket.join(message.data.room_id);
+
+                                /** ルーム情報を更新する */
+                                setRoomInfo(room_info);
+
+                                /** ENTER応答 メッセージ送信 */
+                                msg = createMessage(message.header.sender, 'admin', MSGID_ROOM_ENTER_RES, { room_join_result: true });
+                                socket.emit('message', msg);
+
+                                msg = createMessage('admin', 'all_user', MSGID_ROOM_JOIN_NOTIFY_RTC, { user_name: message.data.user_name });
+                                socket.broadcast.to(message.data.room_id).emit('message', msg);
+
+
+                                /** 配信者の接続状態を確認し接続されていない相手と接続する */
+                                for (let i = 0; i < room_info.get_watchers().length; i++) {
+
+                                    if (false == room_info.get_watcher(i).isPair(room_info.get_positive().get_socket_id())) {
+                                        room_info.get_watcher(i).set_pair(room_info.get_positive().get_socket_id());
+                                    } else {
+                                        //console.log('watcher-positive', room_info.get_positive().get_socket_id());
+                                    }
+
+                                    if (false == room_info.get_watcher(i).isPair(room_info.get_negative().get_socket_id())) {
+                                        room_info.get_watcher(i).set_pair(room_info.get_negative().get_socket_id());
+                                    } else {
+                                        //console.log('watcher-negative', room_info.get_negative().get_socket_id());
+                                    }
+
+                                    if (false == room_info.get_positive().isPair(room_info.get_watcher(i).get_socket_id())) {
+                                        room_info.get_positive().set_pair(room_info.get_watcher(i).get_socket_id());
+                                    } else {
+                                        //console.log('positive-watcher', room_info.get_watcher(i).get_socket_id());
+                                    }
+
+                                    if (false == room_info.get_negative().isPair(room_info.get_watcher(i).get_socket_id())) {
+                                        room_info.get_negative().set_pair(room_info.get_watcher(i).get_socket_id());
+                                    } else {
+                                        //console.log('negative-watcher', room_info.get_watcher(i).get_socket_id());
+                                    }
+
+                                    /** [positive <--> watcher] RTC接続要求 メッセージ送信 */
+                                    msg = createMessage(room_info.get_positive().get_socket_id(), room_info.get_watcher(i).get_socket_id(), MSGID_CONNECTION_REQ, { isWacther: true, user_type: 2 });
+                                    io.to(room_info.get_positive().get_socket_id()).emit('message', msg);
+
+                                    /** [negative <--> watcher] RTC接続要求 メッセージ送信 */
+                                    msg = createMessage(room_info.get_negative().get_socket_id(), room_info.get_watcher(i).get_socket_id(), MSGID_CONNECTION_REQ, { isWacther: true, user_type: 2 });
+                                    io.to(room_info.get_negative().get_socket_id()).emit('message', msg);
+                                }
+                            }
+
+                        } else {
+
+                            console.log('room join not success...', message.data.room_id, message.data.room_type);
+
+                            /** ENTER応答 メッセージ送信 */
+                            msg = createMessage(message.header.sender, 'admin', MSGID_ROOM_ENTER_RES, { room_join_result: false });
+                            socket.emit('message', msg);
+                        }
+                    }
+
+                }
+                break;
+
+            case MSGID_MEDIA:
+
+                let msg = null;
+
+                if (MSG_TYPE_RESPONSE == (message.header.msgid & MSG_TYPE_MASK)) {
+                    let room_info = getRoomInfo(message.data.room_id);
+
+                    if (0 == message.data.user_type) {
+                        room_info.get_positive().set_media(true);
+                    } else if (1 == message.data.user_type) {
+                        room_info.get_negative().set_media(true);
+                    }
+
+                    if (true == room_info.get_positive().get_media() &&
+                        true == room_info.get_negative().get_media()) {
+
+                        /** [positive <--> negative] RTC接続要求 メッセージ送信 */
+                        msg = createMessage(room_info.get_positive().get_socket_id(), room_info.get_negative().get_socket_id(), MSGID_CONNECTION_REQ, { isWacther: false, user_type: 1 });
+                        io.to(room_info.get_positive().get_socket_id()).emit('message', msg);
+
+                        /** 配信者の接続状態を確認し接続されていない相手と接続する */
+                        for (let i = 0; i < room_info.get_watchers().length; i++) {
+
+                            /** [positive <--> watcher] RTC接続要求 メッセージ送信 */
+                            msg = createMessage(room_info.get_positive().get_socket_id(), room_info.get_watcher(i).get_socket_id(), MSGID_CONNECTION_REQ, { isWacther: true, user_type: 2 });
+                            io.to(room_info.get_positive().get_socket_id()).emit('message', msg);
+
+                            /** [negative <--> watcher] RTC接続要求 メッセージ送信 */
+                            msg = createMessage(room_info.get_negative().get_socket_id(), room_info.get_watcher(i).get_socket_id(), MSGID_CONNECTION_REQ, { isWacther: true, user_type: 2 });
+                            io.to(room_info.get_negative().get_socket_id()).emit('message', msg);
+                        }
+                    }
+                }
+                break;
+
+            case MSGID_CONNECTION:
+
+                if (MSG_TYPE_RESPONSE == (message.header.msgid & MSG_TYPE_MASK)) {
+
+                    let room_info = getRoomInfo(message.data.room_id);
+                    let isReady = true;
+
+                    /** ルームが取得できたら視聴者への接続処理を行う */
+                    if (null != room_info) {
+
+                        if (message.header.sender == room_info.get_positive().get_socket_id()) {
+                            if (true == room_info.get_positive().isPair(message.header.destination)) {
+                                for (let i = 0; i < room_info.get_positive().get_pairs_count(); i++) {
+                                    if (message.header.destination == room_info.get_positive().get_pair(i).get_socket_id()) {
+                                        room_info.get_positive().get_pair(i).set_state(message.data.state);
+                                        break;
+                                    }
+                                }
+                            }
+                        } else if (message.header.sender == room_info.get_negative().get_socket_id()) {
+                            if (true == room_info.get_negative().isPair(message.header.destination)) {
+                                for (let i = 0; i < room_info.get_negative().get_pairs_count(); i++) {
+                                    if (message.header.destination == room_info.get_negative().get_pair(i).get_socket_id()) {
+                                        room_info.get_negative().get_pair(i).set_state(message.data.state);
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            for (let i = 0; i < room_info.get_watchers().length; i++) {
+                                if (message.header.sender == room_info.get_watcher(i).get_socket_id()) {
+                                    if (true == room_info.get_watcher(i).isPair(message.header.destination)) {
+                                        for (let j = 0; j < room_info.get_watcher(i).get_pairs_count(); j++) {
+                                            if (message.header.destination == room_info.get_watcher(i).get_pair(j).get_socket_id()) {
+                                                room_info.get_watcher(i).get_pair(j).set_state(message.data.state);
+                                                break;
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        for (let i = 0; i < room_info.get_positive().get_pairs_count(); i++) {
+                            if ('connected' != room_info.get_positive().get_pair(i).get_state()) {
+                                isReady = false;
+                                break;
+                            }
+                        }
+
+                        if (true == isReady) {
+
+                            for (let i = 0; i < room_info.get_negative().get_pairs_count(); i++) {
+
+                                if ('connected' != room_info.get_negative().get_pair(i).get_state()) {
+                                    isReady = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (true == isReady) {
+                            for (let i = 0; i < room_info.get_watchers().length; i++) {
+                                for (let j = 0; j < room_info.get_watcher(i).get_pairs_count(); j++) {
+                                    if ('connected' != room_info.get_watcher(i).get_pair(j).get_state()) {
+                                        isReady = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (true == isReady) {
+                            console.log('game start..');
+
+                            if ('started' != room_info.get_state()) {
+                                room_info.set_state('started');
+                                /** GAME開始要求 メッセージ送信 */
+                                let msg = createMessage('admin', 'all', MSGID_GAME_START_REQ, { dummy: null });
+                                io.to(room_info.get_room_id()).emit('message', msg);
+                            } else {
+                                /** GAME開始要求 メッセージ送信 */
+                                let msg = createMessage('admin', 'watcher', MSGID_GAME_START_REQ, { dummy: null });
+                                io.to(message.header.sender).emit('message', msg);
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case MSGID_COMMUNICATION:
+                if (MSG_TYPE_RTC == (message.header.msgid & MSG_TYPE_MASK)) {
+
+                    /** [positive] MEDIA要求 メッセージ送信 */
+                    let msg = createMessage(message.header.sender, message.header.destination, MSGID_COMMUNICATION_RTC, message.data);
+                    io.to(message.header.destination).emit('message', msg);
+                }
+                break;
+
+            case MSGID_CANDIDATE_RETRY:
+                if (MSG_TYPE_RTC == (message.header.msgid & MSG_TYPE_MASK)) {
+                    /** [positive] MEDIA要求 メッセージ送信 */
+                    let msg = createMessage(message.header.sender, message.header.destination, MSGID_CANDIDATE_RETRY_RTC, message.data);
+                    io.to(message.header.destination).emit('message', msg);
+                }
+                break;
+
+            case MSGID_TIMER_INTERVAL:
+                if (MSG_TYPE_REQUEST == (message.header.msgid & MSG_TYPE_MASK)) {
+                    /** GAME開始要求 メッセージ送信 */
+                    let msg = createMessage('admin', 'all', MSGID_TIMER_INTERVAL_RES, { time: message.data.time });
+                    io.to(message.data.room_id).emit('message', msg);
+                }
+                break;
+
+            case MSGID_POINT_UP:
+                if (MSG_TYPE_REQUEST == (message.header.msgid & MSG_TYPE_MASK)) {
+                    let room_info = getRoomInfo(message.data.room_id);
+                    if (null != room_info) {
+                        if (0 == message.data.point_target) {
+                            /** ポイントアップ */
+                            room_info.get_positive().set_point_countup();
+                            let msg = createMessage('admin', room_info.get_positive().get_socket_id(), MSGID_POINT_UP_RES, { point: room_info.get_positive().get_point() });
+                            io.to(room_info.get_positive().get_socket_id()).emit('message', msg);
+                        } else if (1 == message.data.point_target) {
+                            /** ポイントアップ */
+                            room_info.get_negative().set_point_countup();
+                            let msg = createMessage('admin', room_info.get_negative().get_socket_id(), MSGID_POINT_UP_RES, { point: room_info.get_negative().get_point() });
+                            io.to(room_info.get_negative().get_socket_id()).emit('message', msg);
+                        }
+                    }
+                }
+                break;
+
+            case MSGID_TIMEOUT:
+                if (MSG_TYPE_REQUEST == (message.header.msgid & MSG_TYPE_MASK)) {
+                    let room_info = getRoomInfo(message.data.room_id);
+                    if (null != room_info) {
+                        room_info.set_state('none');
+                        let msg = createMessage('admin', 'all', MSGID_TIMEOUT_RES, { positive: room_info.get_positive().get_point(), negative: room_info.get_negative().get_point() });
+                        io.to(message.data.room_id).emit('message', msg);
+                    }
+
+                }
+                break;
+
+            default:
+                break;
+        }
+
+    });
+
+    socket.on('disconnect', async function () {
+
+        console.log('disconnect', socket.id);
+
+        let room_info = null;
+        let user_info = null;
+
+        /** 切断したユーザーの情報を取得する */
+        user_info = getUserInfo(socket.id);
+
+        if (null != user_info) {
+
+            let socket_id = user_info.socket_id;
+            let user_name = user_info.name;
+            let user_type = user_info.type;
+            let room_id = user_info.room_id;
+
+            /** ユーザー情報削除 */
+            removeUserInfo(socket_id);
+
+            /** 切断したユーザーのルーム情報を取得する */
+            room_info = getRoomInfo(room_id);
+
+            if (null != room_info) {
+
+                /** 切断したユーザー情報を削除する */
+                if (0 == user_type) {
+                    room_info.positive = null;
+                    //console.log('set positive null');
+                } else if (1 == user_type) {
+                    room_info.negative = null;
+                    //console.log('set negative null');
+                } else if (2 == user_type) {
+                    for (let watch = 0; watch < room_info.watchers.length; watch++) {
+                        if (socket_id == room_info.watchers[watch].get_socket_id()) {
+                            //console.log('set watcher null');
+                            room_info.watchers[watch] = null;
+                            room_info.watchers.splice(watch, 1);
+                            break;
+                        }
+                    }
+                }
+
+                if (null != room_info.get_positive()) {
+                    if (true == room_info.get_positive().isPair(socket_id)) {
+                        for (let i = 0; i < room_info.get_positive().get_pairs_count(); i++) {
+                            if (socket_id == room_info.get_positive().get_pair(i).get_socket_id()) {
+                                //console.log('dis-positive-pair', socket_id);
+                                room_info.get_positive().get_pairs().splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    //console.log('positive is null');
+                }
+                if (null != room_info.get_negative()) {
+                    if (true == room_info.get_negative().isPair(socket_id)) {
+                        for (let i = 0; i < room_info.get_negative().get_pairs_count(); i++) {
+                            if (socket_id == room_info.get_negative().get_pair(i).get_socket_id()) {
+                                //console.log('dis-negative-pair', socket_id);
+                                room_info.get_negative().get_pairs().splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    //console.log('negative is null');
+                }
+                if (0 < room_info.watchers.length) {
+                    for (let i = 0; i < room_info.get_watchers().length; i++) {
+                        if (true == room_info.get_watcher(i).isPair(socket_id)) {
+                            for (let j = 0; j < room_info.get_watcher(i).get_pairs_count(); j++) {
+                                if (socket_id == room_info.get_watcher(i).get_pair(j).get_socket_id()) {
+                                    //console.log('dis-watcher-pair', socket_id);
+                                    room_info.get_watcher(i).get_pairs().splice(j, 1);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                } else {
+                    //console.log('watcher is 0');
+                }
+
+                /** ルームに誰もいなくなったらルームを削除する */
+                if (null == room_info.get_positive() &&
+                    null == room_info.get_negative() &&
+                    0 == room_info.get_watchers().length) {
+
+                    /** ルーム削除 */
+                    removeRoomInfo(room_info.room_id);
+                } else {
+                    /** [positive] MEDIA要求 メッセージ送信 */
+                    let msg = createMessage('admin', 'admin', MSGID_DISCONNECTION_REQ, { disconnect_socket: socket_id, user_name: user_name, room_state: room_info.get_state(), user_type: user_type });
+                    socket.broadcast.to(room_id).emit('message', msg);
+
+                    if (2 != user_type) {
+                        /** ルームステータスを初期化する */
+                        room_info.set_state('none');
+                    }
+                }
+            }
+        }
+    });
+
+});
+
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+    let port = parseInt(val, 10);
+
+    if (isNaN(port)) {
+        // named pipe
+        return val;
+    }
+
+    if (port >= 0) {
+        // port number
+        return port;
+    }
+
+    return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    let bind = typeof port === 'string' ?
+        'Pipe ' + port :
+        'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+        case 'EACCES':
+            ////console.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            ////console.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+    let addr = server.address();
+    let bind = typeof addr === 'string' ?
+        'pipe ' + addr :
+        'port ' + addr.port;
+    debug('Listening on ' + bind);
+}

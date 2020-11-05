@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>論破.net</title>
+    <link rel="stylesheet" type="text/css" href="./stylesheets/style.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h1 class="title"><a href="./">論破.net</a></h1>
+
+      <p id="timer"></p>
+
+      <section class="play_top">
+        <div class="play_input">
+          <p id="play_input_roomID"><%= roomID %></p>
+          <p id="play_input_user_name"><%= user_name %></p>
+          <p id="play_input_type"><%= item_type %></p>
+        </div>
+        <div class="play_theme">
+          <h1><%= theme %></h1>
+        </div>
+      </section>
+
+      <section class="play_view">
+        <div id="local_area" class="play_video">
+          <p id="state_local">オフライン</p>
+          <audio id="video_local" autoplay></audio>
+        </div>
+        <h1 class="play_vs">VS</h1>
+        <div id="remote_area" class="play_video">
+          <p id="state_remote">オフライン</p>
+          <audio id="video_remote" autoplay></audio>
+        </div>
+      </section>
+
+      <section id="room_result" style="display: none;">
+        <form name="form_result" class="top_form" method="POST" action="/result_watcher">
+            <input type="hidden" name="user_name" value="<%= user_name %>"/>
+            <input type="hidden" name="result_positive" value=""/>
+            <input type="hidden" name="result_negative" value=""/>
+            <div class="btnItem">
+                <input id="submit_btn" type="submit" value="結果発表">
+            </div>
+        </form>
+    </section>
+
+      <section id="room_leave_view" style="display: none">
+        <form name="form_leave" class="top_form" method="POST" action="/timeline">
+          <input type="hidden" name="user_name" value="<%= user_name %>" />
+          <div class="btnItem">
+            <input id="submit_btn" type="submit" value="退室する" />
+          </div>
+        </form>
+      </section>
+
+      <section id="connection_error" style="display: none">
+        <form name="connection_error" class="top_form" method="POST" action="/connection_error">
+          <input type="hidden" name="user_name" value="<%= user_name %>" />
+          <div class="btnItem">
+            <input id="submit_btn" type="submit" value="通信エラー" />
+          </div>
+        </form>
+    </section>
+
+      <section class="play_log">
+        <ul id="play_room_log">
+          <!-- log -->
+        </ul>
+      </section>
+    </div>
+
+    <script type="text/javascript" src="/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="./javascripts/webRTC.js"></script>
+  </body>
+</html>

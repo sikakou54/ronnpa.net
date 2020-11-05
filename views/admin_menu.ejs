@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="../stylesheets/style.css" />
+    <title>論破.net</title>
+  </head>
+
+  <body>
+    <div class="container">
+        <h1 class="title"><a href="../">論破.net</a></h1>
+        <h1>管理者画面</h1>
+  
+        <form class="admin_form" method="POST" action="/admin/theme">
+            <input type="hidden" name="user" value="<%= user %>">
+            <input type="hidden" name="pw" value="<%= pw %>">
+            <div class="form_items">
+                <input class="form_items_input" id="admin_theme_button" type="submit" value="テーマ管理"/>
+            </div>
+        </form>
+
+        <form class="admin_form" method="POST" action="/admin/room">
+            <input type="hidden" name="user" value="<%= user %>">
+            <input type="hidden" name="pw" value="<%= pw %>">
+            <div class="form_items">
+              <input class="form_items_input" id="admin_room_button" type="submit" value="ルーム管理"/>
+            </div>
+        </form>
+
+        <form class="admin_form" method="POST" action="/admin/user">
+            <input type="hidden" name="user" value="<%= user %>">
+            <input type="hidden" name="pw" value="<%= pw %>">
+            <div class="form_items">
+              <input class="form_items_input" id="admin_user_button" type="submit" value="ユーザー管理"/>
+            </div>
+        </form>
+  </body>
+</html>

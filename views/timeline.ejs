@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="./stylesheets/style.css">
+    <title>論破.net</title>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title"><a href="./">論破.net</a></h1>
+        <h1><%= user_name %>さん</h1>
+
+        <% timelines.forEach(function(timeline){ %>
+        <form class="timeline_form" method="POST" action="/play">
+            
+            <input type="hidden" name="user_name" value="<%= user_name %>">
+
+            <div class="timeline_form_roonID">
+                <input class="roomId" type="text" name="roomID" readonly="readonly" value="<%= timeline.roomid %>">
+            </div>
+            
+            <div class="timeline_form_theme">
+                <input class="theme" type="text" name="theme" readonly="readonly" value="<%= timeline.theme %>">
+            </div>
+
+            <div class="timeline_form_items">
+
+                <div class="selectedItem">
+                    <input id="item_positive" type="radio" name="item_type" value="肯定"">
+                    <label for="item_positive" >肯定</label>
+                </div>
+
+                <div class="selectedItem">
+                    <input id="item_negative" type="radio" name="item_type" value="否定">
+                    <label for="item_negative">否定</label>
+                </div>
+
+                <div class="selectedItem">
+                    <input id="item_audience" type="radio" name="item_type" value="視聴">
+                    <label for="item_audience">視聴</label>
+                </div>
+                
+
+                <div class="btnItem">
+                    <input id="timeline_button" type="submit" value="参加">
+                </div>
+                
+            </div>
+        </form>
+        <% }) %>
+    </div>
+    <script type="text/javascript" src="./javascripts/timeline.js"></script>
+</body>
+</html>

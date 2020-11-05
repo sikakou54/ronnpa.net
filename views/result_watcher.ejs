@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="./stylesheets/style.css" />
+    <title>論破.net</title>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1 class="title"><a href="./">論破.net</a></h1>
+      <h1 style="margin: 10vw; font-size: 10vw">～結果発表～</h1>
+      <h1 style="margin: 10vw; font-size: 5vw">肯定：<%= result_positive %></h1>
+      <h1 style="margin: 10vw; font-size: 5vw">否定：<%= result_negative %></h1>
+      <form class="top_form" method="POST" action="/timeline">
+        <input type="hidden" name="user_name" value="<%= user_name %>" />
+        <div class="btnItem">
+          <input id="submit_btn" type="submit" value="タイムラインへ" />
+        </div>
+      </form>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,202 @@
+* {
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0 5%;
+}
+
+header > span:last-child {
+  text-align: right;
+}
+
+.user_name {
+  width: 30vw;
+  height: 5vw;
+  padding: 1vw;
+  margin: 5vw;
+  font-size: 4vw;
+}
+
+.container {
+  height: 100%;
+  text-align: center;
+}
+
+.timeline_form {
+  text-align: left;
+  border: 1px solid darkgray;
+  margin-bottom: 5vw;
+}
+
+.roomId {
+  padding: 0.5vw;
+  font-size: 2vw;
+}
+
+.theme {
+  margin: 2vw;
+  padding: 2vw;
+  font-size: 6vw;
+  overflow-wrap: normal;
+}
+
+.timeline_form_items {
+  display: flex;
+  justify-content: space-between;
+  margin: 2vw;
+}
+
+input.roomId,
+input.theme {
+  border: none;
+  outline: none;
+}
+
+input[type="radio"] {
+  width: 7vw;
+  height: 7vw;
+  vertical-align: middle;
+}
+
+#top_button,
+#timeline_button {
+  width: 20vw;
+  height: 7vw;
+  font-size: 4vw;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.form_items_input {
+  width: 12vw;
+  height: 2.5vw;
+  font-size: 1.5vw;
+  vertical-align: middle;
+}
+
+.form_items {
+  margin: 1vw;
+}
+
+.form_items_input_theme {
+    width: 60vw;
+    height: 2.5vw;
+    font-size: 1.5vw;
+    vertical-align: middle;
+}
+
+#admin_theme_roomid {
+    display:inline-block;
+    width: 10vw;
+    height: 2vw;
+    font-size: 1.5vw;
+    text-align: center;
+    vertical-align: middle;
+    border: 1px solid darkgray;
+}
+#admin_theme_theme {
+    display:inline-block;
+    width: 60vw;
+    height: 2vw;
+    font-size: 1.5vw;
+    vertical-align: middle;
+    text-align: left;
+    border: 1px solid darkgray;
+}
+
+label {
+  margin: 1vw;
+  font-size: 3.5vw;
+  vertical-align: middle;
+}
+
+.play_top {
+  margin: 2vw;
+  padding: 1vw;
+  border: 1px solid darkgray;
+}
+
+.play_input {
+  display: flex;
+}
+
+.play_input p {
+  padding: 1vw;
+  border: 1px solid darkgray;
+}
+
+.play_theme {
+  text-align: left;
+  padding: 1vw;
+  border: 1px solid darkgray;
+}
+
+.play_theme h1 {
+  font-size: 3vw;
+}
+
+.play_view {
+  margin: 2vw;
+  padding: 2vw;
+  display: flex;
+  align-items: center;
+  border: 1px solid darkgray;
+}
+
+.play_video {
+  height: 40vw;
+  width: 45%;
+  border: 1px solid darkgray;
+}
+
+.play_video:focus {
+  background-color: aqua;
+}
+
+.play_vs {
+  font-size: 5vw;
+  width: 10%;
+}
+
+.play_btnGroup button {
+  margin: 1vw;
+  width: 20vw;
+  height: 5vw;
+}
+
+.play_log {
+  margin: 2vw;
+}
+
+#state_local {
+  font-size: 5vw;
+}
+
+#state_remote {
+  font-size: 5vw;
+}
+
+audio {
+  width: 100%;
+  height: 100%;
+}
+
+#play_room_log {
+  width: 100%;
+  height: 100%;
+  list-style: none;
+  border: 1px solid darkgray;
+}
+
+#play_room_log li {
+  padding: 1vw;
+  font-size: 1vw;
+  text-align: left;
+}

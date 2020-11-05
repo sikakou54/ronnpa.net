@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" type="text/css" href="../stylesheets/style.css" />
+    <title>論破.net</title>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1 class="title"><a href="../">論破.net</a></h1>
+      <% themes.forEach(function(theme){ %>
+      <div class="form_items">
+        <span id="admin_theme_roomid"><%= theme.roomid %></span>
+        <span id="admin_theme_theme"><%= theme.theme %></span>
+      </div>
+      <% }) %>
+
+      <form class="admin_theme_form" method="POST" action="/admin/menu">
+        <input type="hidden" name="user" value="<%= user %>">
+        <input type="hidden" name="pw" value="<%= pw %>">
+        <div class="form_items">
+          <input class="form_items_input" type="submit" value="管理者メニューへ"/>
+        </div>
+      </form>
+      
+    </div>
+  </body>
+
+</html>
