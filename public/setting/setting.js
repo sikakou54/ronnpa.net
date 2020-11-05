@@ -1,8 +1,8 @@
 const db_config = {
-    database: 'd3nt5ettr81peg',
-    user: 'sajuzlpwnxjkzj',
-    password: '3dbd4bc5618c6113cddced7c8b3128f0ef7f315fc40c56738f5cccfde5b68162',
-    host: 'ec2-54-166-114-48.compute-1.amazonaws.com',
+    database: 'd3uofpiad9037a',
+    user: 'tdmuhxlsblennh',
+    password: '5942666ed42d6f2c641c67dd58583cea5196a393d3d208271fa627c653390d8d',
+    host: 'ec2-54-147-126-202.compute-1.amazonaws.com',
     port: 5432
 };
 
