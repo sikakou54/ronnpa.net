@@ -47,7 +47,7 @@ router.post('/theme_disp', function (req, res, next) {
 
     db(query, function (data, result) {
         if (1 == result) {
-            res.render('admin_theme_list', { user: req.body['user'], pw: req.body['pw'], themes: data });
+            res.render('admin_theme_disp', { user: req.body['user'], pw: req.body['pw'], themes: data });
         } else {
             //エラー
         }
