@@ -33,6 +33,11 @@ app.use('/result', resultRouter);
 app.use('/result_watcher', resultWatcherRouter);
 app.use('/admin', adminRouter);
 
+app.use(function(req, res, next) {
+    var reqType = req.headers["x-forwarded-proto"];
+    reqType == 'https' ? next() : res.redirect("https://" + req.headers.host + req.url);
+});
+
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
     next(createError(404));
